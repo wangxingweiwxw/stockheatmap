@@ -1,4 +1,6 @@
 #pip install -r requirement.txt
+import os
+os.system('pip install akshare')
 import streamlit as st
 import akshare as ak
 import plotly.express as px
