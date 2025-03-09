@@ -39,7 +39,7 @@ def process_data(df):
     df['涨跌幅'] = df['涨跌幅'] * 100 # 确保为百分比值
     # 新增四舍五入处理（保留两位小数）
     round_cols = ['涨跌幅', '换手率', '量价强度', '成交额（亿）', '成交量（万手）']
-    df[round_cols] = df[round_cols].round(2)
+    df[round_cols] = df[round_cols].round(0)
     return df.dropna(subset=['涨跌幅'])
 
 # 主程序
