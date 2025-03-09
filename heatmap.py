@@ -40,6 +40,7 @@ def process_data(df):
     # 新增四舍五入处理（保留两位小数）
     round_cols = ['涨跌幅', '换手率', '量价强度', '成交额（亿）', '成交量（万手）']
     df[round_cols] = df[round_cols].round(0)
+    df['涨跌幅'] = df['涨跌幅'] / 100
     return df.dropna(subset=['涨跌幅'])
 
 # 主程序
@@ -115,14 +116,14 @@ def main():
         margin=dict(t=0, l=0, r=0, b=0),
         coloraxis_colorbar=dict(
             title=color_metric + (" (%)"if color_metric =="涨跌幅"else""),
-            tickformat="+.1%"if color_metric =="涨跌幅"else".1f",
+            tickformat=".1f"if color_metric =="涨跌幅"else".1f",
             #titleside="right",
             thickness=15
         )
     )
 
     fig.update_traces(
-        texttemplate='%{label} %{customdata[0]: .2f} % ',
+        texttemplate='%{label} %{customdata[0]:.2f} % ',
         hovertemplate = ('<b>%{label}</b>'
             f'{color_metric}: %{{color:.2f}}{"%" if color_metric == "涨跌幅" else ""}'
             '换手率: %{customdata[1]:.2f}%'
