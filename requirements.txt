@@ -6,3 +6,4 @@ seaborn
 streamlit
 akshare
 plotly.express
+requests
