@@ -1,9 +1,0 @@
-efinance
-pandas
-numpy
-matplotlib
-seaborn
-streamlit
-akshare
-plotly.express
-requests
