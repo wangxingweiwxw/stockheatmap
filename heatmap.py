@@ -1,27 +1,68 @@
 import streamlit as st
-import akshare as ak
+from efinance import stock as ef_stock
 import plotly.express as px
 import pandas as pd
 from datetime import datetime, timedelta
 # 缓存数据获取函数（减少重复请求）
 @st.cache_data(ttl=3600)
 def get_board_data():
-    board_df = ak.stock_board_industry_name_em()
+    try:
+        board_df = ef_stock.get_realtime_quotes('行业板块')
+    except Exception:
+        return pd.DataFrame()
+
+    if board_df is None or board_df.empty:
+        return pd.DataFrame()
 
     data_list = []
-    for index, row in board_df.iterrows():
-        try:
-            df = ak.stock_board_industry_hist_em(
-                symbol = row["板块名称"],
-                start_date = (datetime.now() - timedelta(days=7)).strftime("%Y%m%d"),
-                end_date = datetime.now().strftime("%Y%m%d"),
-                adjust = ""
-            )
-            latest = df.iloc[-1].to_dict()
-            latest["板块名称"] = row["板块名称"]
-            data_list.append(latest)
-        except Exception as e:
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=7)
+
+    for _, row in board_df.iterrows():
+        board_name = row.get("股票名称") or row.get("板块名称")
+        if pd.isna(board_name):
+            board_name = None
+        else:
+            board_name = str(board_name)
+
+        quote_id = row.get("行情ID")
+        code = row.get("股票代码")
+
+        if pd.isna(quote_id):
+            quote_id = None
+        elif isinstance(quote_id, float):
+            quote_id = str(int(quote_id))
+        else:
+            quote_id = str(quote_id)
+
+        if pd.isna(code):
+            code = None
+        elif isinstance(code, float):
+            code = str(int(code))
+        else:
+            code = str(code)
+
+        if not board_name or not (quote_id or code):
             continue
+
+        try:
+            history_df = ef_stock.get_quote_history(
+                quote_id if quote_id else code,
+                beg=start_date.strftime("%Y%m%d"),
+                end=end_date.strftime("%Y%m%d"),
+                quote_id_mode=bool(quote_id),
+            )
+        except Exception:
+            continue
+
+        if history_df is None or history_df.empty:
+            continue
+
+        history_df = history_df.sort_values('日期')
+        latest = history_df.iloc[-1].copy()
+        latest["板块名称"] = board_name
+        latest["板块代码"] = code
+        data_list.append(latest)
 
     return pd.DataFrame(data_list)
 
