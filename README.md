@@ -34,11 +34,10 @@
 - Python 3.12+
 - 依赖库：
   - streamlit
-  - akshare
+  - baostock
   - plotly
   - pandas
   - numpy
-  - efinance
   - requests
 
 安装部署
@@ -53,11 +52,10 @@ pip install -r requirements.txt
 
 ```
 streamlit==1.24.0
-akshare==1.10.0
+baostock==0.8.8
 plotly==5.14.1
 pandas==2.0.2
 numpy==1.24.3
-efinance==0.4.7
 requests==2.31.0
 ```
 

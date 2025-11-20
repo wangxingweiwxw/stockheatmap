@@ -1,70 +1,85 @@
 import streamlit as st
-from efinance import stock as ef_stock
 import plotly.express as px
 import pandas as pd
+import baostock as bs
 from datetime import datetime, timedelta
 # 缓存数据获取函数（减少重复请求）
 @st.cache_data(ttl=3600)
 def get_board_data():
+    login_res = bs.login()
+    if login_res.error_code != "0":
+        return pd.DataFrame()
+
     try:
-        board_df = ef_stock.get_realtime_quotes('行业板块')
-    except Exception:
-        return pd.DataFrame()
+        industry_rs = bs.query_stock_industry()
+        industry_rows = []
+        while industry_rs.error_code == "0" and industry_rs.next():
+            industry_rows.append(industry_rs.get_row_data())
 
-    if board_df is None or board_df.empty:
-        return pd.DataFrame()
+        if not industry_rows:
+            return pd.DataFrame()
 
-    data_list = []
-    end_date = datetime.now()
-    start_date = end_date - timedelta(days=7)
+        industry_df = pd.DataFrame(industry_rows, columns=industry_rs.fields)
+        stock_codes = industry_df["code"].unique()
 
-    for _, row in board_df.iterrows():
-        board_name = row.get("股票名称") or row.get("板块名称")
-        if pd.isna(board_name):
-            board_name = None
-        else:
-            board_name = str(board_name)
-
-        quote_id = row.get("行情ID")
-        code = row.get("股票代码")
-
-        if pd.isna(quote_id):
-            quote_id = None
-        elif isinstance(quote_id, float):
-            quote_id = str(int(quote_id))
-        else:
-            quote_id = str(quote_id)
-
-        if pd.isna(code):
-            code = None
-        elif isinstance(code, float):
-            code = str(int(code))
-        else:
-            code = str(code)
-
-        if not board_name or not (quote_id or code):
-            continue
-
-        try:
-            history_df = ef_stock.get_quote_history(
-                quote_id if quote_id else code,
-                beg=start_date.strftime("%Y%m%d"),
-                end=end_date.strftime("%Y%m%d"),
-                quote_id_mode=bool(quote_id),
+        end_date = datetime.now().strftime("%Y-%m-%d")
+        market_rows = []
+        for code in stock_codes:
+            k_rs = bs.query_history_k_data_plus(
+                code,
+                "date,code,open,close,high,low,volume,amount,pctChg,turn",
+                start_date=end_date,
+                end_date=end_date,
+                frequency="d",
+                adjustflag="3",
             )
-        except Exception:
-            continue
 
-        if history_df is None or history_df.empty:
-            continue
+            if k_rs.error_code != "0":
+                continue
 
-        history_df = history_df.sort_values('日期')
-        latest = history_df.iloc[-1].copy()
-        latest["板块名称"] = board_name
-        latest["板块代码"] = code
-        data_list.append(latest)
+            while k_rs.next():
+                market_rows.append(k_rs.get_row_data())
 
-    return pd.DataFrame(data_list)
+        if not market_rows:
+            return pd.DataFrame()
+
+        market_df = pd.DataFrame(market_rows, columns=k_rs.fields)
+        merged_df = market_df.merge(industry_df, on="code", how="left")
+
+        numeric_cols = [
+            "open",
+            "close",
+            "high",
+            "low",
+            "volume",
+            "amount",
+            "pctChg",
+            "turn",
+        ]
+        merged_df[numeric_cols] = merged_df[numeric_cols].apply(
+            pd.to_numeric, errors="coerce"
+        )
+
+        grouped = merged_df.groupby("industry")
+
+        aggregated = grouped.agg(
+            日期=("date", "max"),
+            开盘=("open", "mean"),
+            收盘=("close", "mean"),
+            最高=("high", "mean"),
+            最低=("low", "mean"),
+            成交量=("volume", "sum"),
+            成交额=("amount", "sum"),
+            涨跌幅=("pctChg", "mean"),
+            换手率=("turn", "mean"),
+        ).reset_index()
+
+        aggregated["板块名称"] = aggregated["industry"]
+        aggregated["板块代码"] = aggregated["industry"]
+
+        return aggregated
+    finally:
+        bs.logout()
 
 # 数据处理函数
 def process_data(df):

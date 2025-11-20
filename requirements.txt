@@ -1,6 +1,5 @@
 streamlit
-akshare
-efinance
+baostock
 pandas
 numpy
 plotly
